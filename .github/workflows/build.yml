@@ -8,41 +8,46 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: ubuntu:20.04
     steps:
       - uses: actions/checkout@v4
       
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-      
       - name: Install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev
+          apt update
+          apt install -y python3 python3-pip git zip unzip openjdk-11-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev wget
+          ln -s /usr/bin/python3 /usr/bin/python
           
-          # 安装 Android SDK tools
+          # 下载 Android SDK
           wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
           unzip commandlinetools-linux-11076708_latest.zip
-          mkdir -p android-sdk/cmdline-tools
-          mv cmdline-tools android-sdk/cmdline-tools/latest
-          export ANDROID_SDK_ROOT=$PWD/android-sdk
+          mkdir -p /opt/android-sdk/cmdline-tools
+          mv cmdline-tools /opt/android-sdk/cmdline-tools/latest
+          export ANDROID_SDK_ROOT=/opt/android-sdk
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
           
+          # 安装 build-tools
           yes | sdkmanager --licenses
           sdkmanager "build-tools;30.0.3" "platform-tools" "platforms;android-30"
           
-          echo "ANDROID_SDK_ROOT=$PWD/android-sdk" >> $GITHUB_ENV
-          echo "$PWD/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$PWD/android-sdk/build-tools/30.0.3" >> $GITHUB_PATH
+          # 设置环境变量
+          echo "ANDROID_SDK_ROOT=/opt/android-sdk" >> $GITHUB_ENV
+          echo "/opt/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "/opt/android-sdk/build-tools/30.0.3" >> $GITHUB_PATH
           
           # 安装 Python 包
-          pip install --upgrade pip
-          pip install cython==0.29.36 buildozer
+          pip3 install --upgrade pip
+          pip3 install cython==0.29.36 buildozer
+      
+      - name: Verify aidl
+        run: |
+          /opt/android-sdk/build-tools/30.0.3/aidl --version
       
       - name: Build APK
         run: |
-          export ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT
+          export FORCE_ROOT=1
+          export ANDROID_SDK_ROOT=/opt/android-sdk
           buildozer android debug
       
       - name: Upload APK
